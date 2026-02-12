@@ -1,94 +1,93 @@
-# 🎬 Slippa
+# ✂️ Slippa
 
-**AI-powered YouTube clip generator that runs 100% locally.**
+**AI-powered YouTube clip generator — runs 100% locally.**
 
-Slippa takes a YouTube link (or local video file), automatically finds the most engaging moments using local AI, cuts them into clips, and optionally uploads them back to YouTube — all without any paid APIs or cloud dependencies.
+Drop a YouTube link, get clips. No paid APIs, no cloud, no limits.
 
-## ✨ Features (Planned)
+![Dashboard](https://img.shields.io/badge/UI-Dark%20Glassmorphism-8b5cf6)
+![Python](https://img.shields.io/badge/Python-3.10+-3776ab)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-- 📥 **Download** videos from YouTube via `yt-dlp`
-- 🎤 **Transcribe** audio locally using OpenAI Whisper
-- 🧠 **Detect** the best clip-worthy moments from the transcript
-- ✂️ **Cut** clips using `ffmpeg`
-- 📤 **Upload** clips to YouTube via the YouTube Data API
-- 🔄 **Automate** batch processing and scheduling
-- 🖥️ **Web UI** dashboard for managing everything
+## Features
 
-## 🛠️ Tech Stack
+- 🎬 **Download** — Grab any YouTube video via `yt-dlp`
+- 🎤 **Transcribe** — Local speech-to-text via `faster-whisper` (no API keys)
+- 🧠 **Detect Clips** — Sliding-window analysis finds the most engaging moments
+- ✂️ **Cut** — Frame-perfect re-encoding via `ffmpeg`
+- 📤 **Upload** — Optional YouTube upload with OAuth2
+- 📊 **Batch** — Process multiple videos in one go
+- ⚙️ **Settings** — Whisper model, clip duration, max clips — all configurable
+- 📜 **History** — Track all processed jobs
 
-| Component | Tool |
-|---|---|
-| Video Download | `yt-dlp` |
-| Transcription | `faster-whisper` (local, free) |
-| Clip Detection | Custom transcript analysis |
-| Video Cutting | `ffmpeg` |
-| YouTube Upload | YouTube Data API v3 |
-| Web UI | Flask |
-| Language | Python 3.10+ |
-
-## 📦 Prerequisites
-
-- **Python 3.10+**
-- **ffmpeg** installed and available in your PATH
-  ```bash
-  # macOS
-  brew install ffmpeg
-  
-  # Ubuntu/Debian
-  sudo apt install ffmpeg
-  ```
-
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
-# Clone the repo
+# Clone
 git clone https://github.com/Srazyy/Slippa.git
 cd Slippa
 
-# Create a virtual environment
+# Setup
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Run Slippa
-python -m slippa
+# Run
+python -m slippa          # Web UI at http://localhost:5000
+python -m slippa --cli    # CLI mode
 ```
 
-## 📁 Project Structure
+## Prerequisites
+
+- Python 3.10+
+- ffmpeg (`brew install ffmpeg`)
+- ~1 GB disk for Whisper model (auto-downloads on first run)
+
+## Pages
+
+| Page | Description |
+|------|-------------|
+| **Home** | Paste a YouTube URL → generate clips |
+| **Batch** | Process multiple URLs at once |
+| **History** | See all past jobs with status |
+| **Settings** | Whisper model, durations, max clips, privacy |
+
+## YouTube Upload (Optional)
+
+To upload clips directly to YouTube:
+
+1. Follow [docs/YOUTUBE_SETUP.md](docs/YOUTUBE_SETUP.md) to get credentials
+2. Place `client_secrets.json` in the project root
+3. Click "📤 YouTube" on any clip → authorize → done
+
+## Tech Stack
+
+- **yt-dlp** — video download
+- **faster-whisper** — local speech-to-text
+- **ffmpeg** — video cutting
+- **Flask** — web UI
+- **Google API** — YouTube upload (optional)
+
+## Project Structure
 
 ```
 Slippa/
-├── slippa/                 # Main package
+├── slippa/
 │   ├── __init__.py
-│   ├── __main__.py         # Entry point (python -m slippa)
-│   ├── downloader.py       # YouTube video downloader
-│   ├── transcriber.py      # Local Whisper transcription
-│   ├── clipper.py          # Clip detection logic
-│   ├── cutter.py           # ffmpeg video cutting
-│   └── uploader.py         # YouTube upload
+│   ├── __main__.py      # Entry point
+│   ├── web.py           # Flask app (17 routes)
+│   ├── downloader.py    # yt-dlp wrapper
+│   ├── transcriber.py   # faster-whisper wrapper
+│   ├── clipper.py       # Clip detection algorithm
+│   ├── cutter.py        # ffmpeg clip cutting
+│   └── uploader.py      # YouTube upload + OAuth2
 ├── config/
-│   └── settings.py         # App configuration
-├── tests/                  # Unit tests
-├── requirements.txt
-├── .gitignore
-└── README.md
+│   └── settings.py      # Persistent JSON settings
+├── templates/           # Jinja2 HTML templates
+├── static/              # CSS styles
+├── docs/                # Setup guides
+└── requirements.txt
 ```
 
-## 🗺️ Roadmap
-
-- [x] Phase 0: Project setup
-- [ ] Phase 1: Download + Transcribe
-- [ ] Phase 2: Clip detection + Cutting
-- [ ] Phase 3: Web UI
-- [ ] Phase 4: YouTube Upload integration
-- [ ] Phase 5: Automation + Polish
-
-## 📄 License
+## License
 
 MIT
-
-## 🤝 Contributing
-
-This is a learning project. Contributions and suggestions are welcome!

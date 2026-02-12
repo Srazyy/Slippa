@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}History — Slippa{% endblock %}
+
+{% block content %}
+{% if jobs %}
+<div class="results-header">
+    <h2>Job History</h2>
+    <span class="status-text">{{ jobs | length }} job{{ 's' if jobs | length != 1 }}</span>
+</div>
+
+<div class="history-list">
+    {% for job_id, job in jobs %}
+    <a href="/results/{{ job_id }}" class="history-card" style="text-decoration: none;">
+        <div class="history-left">
+            <div class="history-status
+                {% if job.status == 'done' %}status-done
+                {% elif job.status == 'error' %}status-error
+                {% else %}status-active{% endif %}">
+            </div>
+            <div>
+                <h3 class="history-title">{{ job.video_title or job.source[:50] or 'Untitled' }}</h3>
+                <p class="history-meta">
+                    {{ job.created_at[:16].replace('T', ' ') if job.created_at else '' }}
+                    {% if job.clips %} · {{ job.clips | length }} clip{{ 's' if job.clips | length != 1 }}{% endif %}
+                </p>
+            </div>
+        </div>
+        <div class="history-right">
+            {% if job.status == 'done' and job.clips %}
+            <span class="clip-badge">{{ job.clips | length }} clips</span>
+            {% elif job.status == 'error' %}
+            <span class="clip-badge" style="background: rgba(239,68,68,0.15); color: #ef4444;">Error</span>
+            {% elif job.status == 'done' and not job.clips %}
+            <span class="clip-badge" style="background: rgba(245,158,11,0.15); color: #f59e0b;">No clips</span>
+            {% else %}
+            <span class="clip-badge" style="background: rgba(139,92,246,0.15); color: #a78bfa;">Processing</span>
+            {% endif %}
+            <span class="history-arrow">→</span>
+        </div>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align: center;">
+    <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
+    <h2>No jobs yet</h2>
+    <p class="subtitle">Process a video to see it here.</p>
+    <a href="/" class="btn-download" style="display: inline-flex; margin-top: 16px; text-decoration: none;">
+        ← Go to Dashboard
+    </a>
+</div>
+{% endif %}
+{% endblock %}

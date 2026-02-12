@@ -1,13 +1,14 @@
 """
 Flask web application for Slippa.
 
-This is the web UI that lets users interact with the pipeline
-through a browser instead of the command line.
-
 Routes:
     /              → Dashboard (paste YouTube URL or upload file)
+    /batch         → Batch processing (multiple URLs)
+    /history       → Job history
+    /settings      → Settings page
     /process       → POST: starts processing a video
-    /status/<id>   → GET: returns processing status (JSON, for polling)
+    /batch-process → POST: starts batch processing
+    /status/<id>   → GET: returns processing status (JSON)
     /results/<id>  → Results page with clip previews
     /download/<id>/<clip> → Download a specific clip
     /clips/<path>  → Serve clip video files
@@ -20,6 +21,7 @@ Routes:
 import os
 import uuid
 import threading
+from datetime import datetime
 from flask import (
     Flask, render_template, request, jsonify,
     send_from_directory, redirect, url_for
@@ -30,6 +32,7 @@ from slippa.transcriber import transcribe_audio
 from slippa.clipper import find_clips
 from slippa.cutter import cut_clips
 from slippa import uploader
+from config import settings as config
 
 app = Flask(
     __name__,
@@ -37,11 +40,8 @@ app = Flask(
     static_folder=os.path.join(os.path.dirname(__file__), "..", "static"),
 )
 
-# Store processing jobs in memory (simple approach for MVP)
-# Key: job_id, Value: dict with status, progress, clips, error
+# In-memory job stores
 jobs = {}
-
-# Track upload status per clip
 upload_jobs = {}
 
 CLIPS_BASE_DIR = "clips"
@@ -49,37 +49,41 @@ DOWNLOADS_DIR = "downloads"
 
 
 def _process_video(job_id: str, source: str):
-    """
-    Background thread function that runs the full pipeline.
-    Updates the job dict as it progresses so the UI can poll for status.
-    """
+    """Background thread: runs the full pipeline for one video."""
     job = jobs[job_id]
+    settings = config.load_settings()
 
     try:
-        # Step 1: Download (if URL)
+        # Step 1: Download
         job["status"] = "downloading"
         job["progress"] = "Downloading video..."
 
         if source.startswith(("http://", "https://", "www.")):
-            video_path = download_video(source, output_dir=DOWNLOADS_DIR)
+            video_path = download_video(source, output_dir=settings["download_dir"])
         else:
             video_path = source
 
         job["video_title"] = os.path.splitext(os.path.basename(video_path))[0]
+        job["source"] = source
         job["progress"] = f"Downloaded: {job['video_title']}"
 
         # Step 2: Transcribe
         job["status"] = "transcribing"
-        job["progress"] = "Transcribing audio with Whisper (this takes a bit)..."
+        job["progress"] = f"Transcribing with Whisper ({settings['whisper_model']})..."
 
-        segments = transcribe_audio(video_path)
+        segments = transcribe_audio(video_path, model_size=settings["whisper_model"])
         job["progress"] = f"Transcribed {len(segments)} segments"
 
         # Step 3: Find clips
         job["status"] = "analyzing"
         job["progress"] = "Analyzing transcript for best clips..."
 
-        clips = find_clips(segments)
+        clips = find_clips(
+            segments,
+            min_duration=settings["min_clip_duration"],
+            max_duration=settings["max_clip_duration"],
+            max_clips=settings["max_clips"],
+        )
         job["progress"] = f"Found {len(clips)} clips"
 
         if not clips:
@@ -92,10 +96,9 @@ def _process_video(job_id: str, source: str):
         job["status"] = "cutting"
         job["progress"] = "Cutting clips with ffmpeg..."
 
-        clip_output_dir = os.path.join(CLIPS_BASE_DIR, job_id)
+        clip_output_dir = os.path.join(settings["clips_dir"], job_id)
         clip_paths = cut_clips(video_path, clips, output_dir=clip_output_dir)
 
-        # Build clip info for the UI
         clip_info = []
         for i, (path, clip_data) in enumerate(zip(clip_paths, clips)):
             duration = clip_data["end"] - clip_data["start"]
@@ -120,31 +123,75 @@ def _process_video(job_id: str, source: str):
         job["error"] = str(e)
 
 
+# ---- Page Routes ----
+
 @app.route("/")
 def index():
-    """Dashboard page."""
-    return render_template("index.html")
+    return render_template("index.html", page="home")
 
+
+@app.route("/batch")
+def batch_page():
+    return render_template("batch.html", page="batch")
+
+
+@app.route("/history")
+def history_page():
+    # Sort jobs by time (newest first)
+    sorted_jobs = sorted(
+        jobs.items(),
+        key=lambda x: x[1].get("created_at", ""),
+        reverse=True,
+    )
+    return render_template("history.html", page="history", jobs=sorted_jobs)
+
+
+@app.route("/settings")
+def settings_page():
+    current = config.load_settings()
+    return render_template(
+        "settings.html",
+        page="settings",
+        settings=current,
+        whisper_models=config.WHISPER_MODELS,
+    )
+
+
+@app.route("/settings", methods=["POST"])
+def save_settings_route():
+    new_settings = {
+        "whisper_model": request.form.get("whisper_model", "base"),
+        "min_clip_duration": int(request.form.get("min_clip_duration", 15)),
+        "max_clip_duration": int(request.form.get("max_clip_duration", 90)),
+        "target_clip_duration": int(request.form.get("target_clip_duration", 45)),
+        "max_clips": int(request.form.get("max_clips", 10)),
+        "default_privacy": request.form.get("default_privacy", "private"),
+    }
+    current = config.load_settings()
+    current.update(new_settings)
+    config.save_settings(current)
+    return redirect(url_for("settings_page"))
+
+
+# ---- Processing Routes ----
 
 @app.route("/process", methods=["POST"])
 def process():
-    """Start processing a video."""
     source = request.form.get("source", "").strip()
-
     if not source:
         return jsonify({"error": "No source provided"}), 400
 
-    # Create a new job
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
         "status": "starting",
         "progress": "Starting...",
         "clips": [],
         "video_title": "",
+        "source": source,
         "error": None,
+        "created_at": datetime.now().isoformat(),
     }
 
-    # Run pipeline in background thread
     thread = threading.Thread(target=_process_video, args=(job_id, source))
     thread.daemon = True
     thread.start()
@@ -152,9 +199,46 @@ def process():
     return jsonify({"job_id": job_id})
 
 
+@app.route("/batch-process", methods=["POST"])
+def batch_process():
+    """Process multiple URLs at once."""
+    urls_text = request.form.get("urls", "").strip()
+    if not urls_text:
+        return jsonify({"error": "No URLs provided"}), 400
+
+    urls = [u.strip() for u in urls_text.splitlines() if u.strip()]
+    if not urls:
+        return jsonify({"error": "No valid URLs found"}), 400
+
+    job_ids = []
+    for url in urls:
+        job_id = str(uuid.uuid4())[:8]
+        jobs[job_id] = {
+            "status": "queued",
+            "progress": "Queued...",
+            "clips": [],
+            "video_title": "",
+            "source": url,
+            "error": None,
+            "created_at": datetime.now().isoformat(),
+            "batch": True,
+        }
+        job_ids.append(job_id)
+
+    # Process sequentially in a background thread to avoid overload
+    def _batch_runner(ids):
+        for jid in ids:
+            _process_video(jid, jobs[jid]["source"])
+
+    thread = threading.Thread(target=_batch_runner, args=(job_ids,))
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({"job_ids": job_ids})
+
+
 @app.route("/status/<job_id>")
 def status(job_id):
-    """Poll for job status."""
     job = jobs.get(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
@@ -163,23 +247,20 @@ def status(job_id):
 
 @app.route("/results/<job_id>")
 def results(job_id):
-    """Results page with clip previews."""
     job = jobs.get(job_id)
     if not job:
         return redirect(url_for("index"))
-    return render_template("results.html", job_id=job_id, job=job)
+    return render_template("results.html", job_id=job_id, job=job, page="home")
 
 
 @app.route("/clips/<job_id>/<filename>")
 def serve_clip(job_id, filename):
-    """Serve a clip video file for preview/download."""
     clip_dir = os.path.join(os.getcwd(), CLIPS_BASE_DIR, job_id)
     return send_from_directory(clip_dir, filename)
 
 
 @app.route("/download/<job_id>/<filename>")
 def download_clip(job_id, filename):
-    """Download a clip file."""
     clip_dir = os.path.join(os.getcwd(), CLIPS_BASE_DIR, job_id)
     return send_from_directory(clip_dir, filename, as_attachment=True)
 
@@ -188,7 +269,6 @@ def download_clip(job_id, filename):
 
 @app.route("/youtube/status")
 def youtube_status():
-    """Check if YouTube is configured and authenticated."""
     return jsonify({
         "configured": uploader.is_configured(),
         "authenticated": uploader.is_authenticated(),
@@ -197,7 +277,6 @@ def youtube_status():
 
 @app.route("/youtube/auth")
 def youtube_auth():
-    """Start YouTube OAuth2 flow — redirects to Google login."""
     try:
         auth_url = uploader.get_auth_url()
         return redirect(auth_url)
@@ -207,7 +286,6 @@ def youtube_auth():
 
 @app.route("/oauth/callback")
 def oauth_callback():
-    """Handle OAuth2 callback from Google."""
     try:
         uploader.handle_oauth_callback(request.url)
         return render_template("auth_success.html")
@@ -217,35 +295,31 @@ def oauth_callback():
 
 @app.route("/upload", methods=["POST"])
 def upload_clip_to_youtube():
-    """Upload a clip to YouTube."""
     data = request.get_json()
     job_id = data.get("job_id")
     filename = data.get("filename")
     title = data.get("title", filename)
     description = data.get("description", "Generated by Slippa")
-    privacy = data.get("privacy", "private")
+    privacy = data.get("privacy", config.get("default_privacy"))
 
     if not job_id or not filename:
         return jsonify({"error": "Missing job_id or filename"}), 400
 
     if not uploader.is_authenticated():
-        return jsonify({"error": "Not authenticated. Please log in first.", "need_auth": True}), 401
+        return jsonify({"error": "Not authenticated.", "need_auth": True}), 401
 
     clip_path = os.path.join(os.getcwd(), CLIPS_BASE_DIR, job_id, filename)
     if not os.path.exists(clip_path):
         return jsonify({"error": "Clip file not found"}), 404
 
-    # Track this upload
     upload_id = f"{job_id}_{filename}"
-    upload_jobs[upload_id] = {"status": "uploading", "progress": "Starting upload...", "result": None}
+    upload_jobs[upload_id] = {"status": "uploading", "progress": "Starting...", "result": None}
 
     def _do_upload():
         try:
             result = uploader.upload_video(
-                file_path=clip_path,
-                title=title,
-                description=description,
-                privacy_status=privacy,
+                file_path=clip_path, title=title,
+                description=description, privacy_status=privacy,
             )
             upload_jobs[upload_id] = {"status": "done", "progress": "Uploaded!", "result": result}
         except Exception as e:
@@ -254,21 +328,20 @@ def upload_clip_to_youtube():
     thread = threading.Thread(target=_do_upload)
     thread.daemon = True
     thread.start()
-
     return jsonify({"upload_id": upload_id})
 
 
 @app.route("/upload-status/<upload_id>")
 def upload_status(upload_id):
-    """Poll upload status."""
     job = upload_jobs.get(upload_id)
     if not job:
         return jsonify({"error": "Upload not found"}), 404
     return jsonify(job)
 
 
+# ---- Server ----
+
 def run_web():
-    """Start the web server."""
     yt_status = "✅ configured" if uploader.is_configured() else "❌ no client_secrets.json"
     print(f"\n🌐 Slippa Web UI running at: http://localhost:5000")
     print(f"📤 YouTube upload: {yt_status}\n")

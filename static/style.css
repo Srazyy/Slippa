@@ -89,6 +89,40 @@ body::before {
 .header {
     text-align: center;
     margin-bottom: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.nav {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    backdrop-filter: blur(20px);
+}
+
+.nav-link {
+    padding: 8px 18px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--radius-xs);
+    transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.nav-link.active {
+    color: var(--text-primary);
+    background: var(--accent-glow);
 }
 
 .logo {
@@ -195,6 +229,55 @@ body::before {
 
 .input-group button:active {
     transform: translateY(0);
+}
+
+/* --- Textarea --- */
+.textarea {
+    width: 100%;
+    padding: 14px 18px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    line-height: 1.8;
+    resize: vertical;
+    outline: none;
+    transition: all 0.25s ease;
+}
+
+.textarea::placeholder {
+    color: var(--text-muted);
+}
+
+.textarea:focus {
+    border-color: var(--border-glow);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.btn-primary {
+    padding: 14px 28px;
+    background: var(--accent-gradient);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.3);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .btn-icon {
@@ -569,6 +652,212 @@ body::before {
     font-size: 13px;
 }
 
+/* --- Batch Page --- */
+.batch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+}
+
+.batch-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    transition: all 0.3s ease;
+}
+
+.batch-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.batch-num {
+    font-weight: 700;
+    color: var(--accent-light);
+    font-size: 14px;
+}
+
+.batch-card-status {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.batch-card-title {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: 500;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.batch-card-progress {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.batch-done {
+    border-color: rgba(16, 185, 129, 0.2);
+}
+
+.batch-error {
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+.batch-active {
+    border-color: var(--border-glow);
+    box-shadow: var(--shadow-glow);
+}
+
+.batch-link {
+    color: var(--accent-light);
+    text-decoration: none;
+}
+
+.batch-link:hover {
+    text-decoration: underline;
+}
+
+/* --- History Page --- */
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.history-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 16px 20px;
+    transition: all 0.25s ease;
+    color: inherit;
+}
+
+.history-card:hover {
+    border-color: var(--border-glow);
+    background: var(--bg-card-hover);
+}
+
+.history-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.history-status {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-done {
+    background: var(--success);
+}
+
+.status-error {
+    background: var(--error);
+}
+
+.status-active {
+    background: var(--warning);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.history-title {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.history-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.history-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.history-arrow {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* --- Settings Page --- */
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.setting-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.setting-label {
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.setting-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.setting-input,
+.setting-select {
+    padding: 12px 16px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xs);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.25s ease;
+}
+
+.setting-input:focus,
+.setting-select:focus {
+    border-color: var(--border-glow);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.setting-select option {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.setting-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
 /* --- Utilities --- */
 .hidden {
     display: none !important;
@@ -598,5 +887,18 @@ body::before {
 
     .step-line {
         width: 30px;
+    }
+
+    .nav {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .setting-row {
+        grid-template-columns: 1fr;
+    }
+
+    .batch-grid {
+        grid-template-columns: 1fr;
     }
 }

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Slippa{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app">
+        <header class="header">
+            <a href="/" style="text-decoration: none;">
+                <div class="logo">
+                    <span class="logo-icon">✂️</span>
+                    <span class="logo-text">Slippa</span>
+                </div>
+            </a>
+            <nav class="nav">
+                <a href="/" class="nav-link {% if page == 'home' %}active{% endif %}">Home</a>
+                <a href="/batch" class="nav-link {% if page == 'batch' %}active{% endif %}">Batch</a>
+                <a href="/history" class="nav-link {% if page == 'history' %}active{% endif %}">History</a>
+                <a href="/settings" class="nav-link {% if page == 'settings' %}active{% endif %}">Settings</a>
+            </nav>
+        </header>
+
+        <main class="main">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="footer">
+            <p>Built with ❤️ — 100% local, 0% cloud</p>
+        </footer>
+    </div>
+
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

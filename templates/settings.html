@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Settings — Slippa{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Settings</h2>
+    <p class="subtitle">Configure how Slippa processes your videos</p>
+
+    <form method="POST" action="/settings" class="settings-form">
+        <!-- Whisper Model -->
+        <div class="setting-group">
+            <label class="setting-label" for="whisper_model">
+                🎤 Whisper Model
+                <span class="setting-hint">Larger = more accurate but slower</span>
+            </label>
+            <select name="whisper_model" id="whisper_model" class="setting-select">
+                {% for model in whisper_models %}
+                <option value="{{ model.value }}" {% if settings.whisper_model==model.value %}selected{% endif %}>
+                    {{ model.label }} — {{ model.desc }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Clip Duration -->
+        <div class="setting-row">
+            <div class="setting-group">
+                <label class="setting-label" for="min_clip_duration">
+                    ⏱️ Min Clip Duration
+                    <span class="setting-hint">Seconds</span>
+                </label>
+                <input type="number" name="min_clip_duration" id="min_clip_duration"
+                    value="{{ settings.min_clip_duration }}" min="5" max="300" class="setting-input">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label" for="max_clip_duration">
+                    ⏱️ Max Clip Duration
+                    <span class="setting-hint">Seconds</span>
+                </label>
+                <input type="number" name="max_clip_duration" id="max_clip_duration"
+                    value="{{ settings.max_clip_duration }}" min="10" max="600" class="setting-input">
+            </div>
+            <div class="setting-group">
+                <label class="setting-label" for="target_clip_duration">
+                    🎯 Target Duration
+                    <span class="setting-hint">Sweet spot</span>
+                </label>
+                <input type="number" name="target_clip_duration" id="target_clip_duration"
+                    value="{{ settings.target_clip_duration }}" min="10" max="300" class="setting-input">
+            </div>
+        </div>
+
+        <!-- Max Clips -->
+        <div class="setting-group">
+            <label class="setting-label" for="max_clips">
+                📊 Max Clips per Video
+                <span class="setting-hint">Maximum number of clips to generate</span>
+            </label>
+            <input type="number" name="max_clips" id="max_clips" value="{{ settings.max_clips }}" min="1" max="50"
+                class="setting-input" style="max-width: 120px;">
+        </div>
+
+        <!-- Privacy -->
+        <div class="setting-group">
+            <label class="setting-label" for="default_privacy">
+                🔒 Default Upload Privacy
+                <span class="setting-hint">For YouTube uploads</span>
+            </label>
+            <select name="default_privacy" id="default_privacy" class="setting-select" style="max-width: 200px;">
+                <option value="private" {% if settings.default_privacy=='private' %}selected{% endif %}>Private</option>
+                <option value="unlisted" {% if settings.default_privacy=='unlisted' %}selected{% endif %}>Unlisted
+                </option>
+                <option value="public" {% if settings.default_privacy=='public' %}selected{% endif %}>Public</option>
+            </select>
+        </div>
+
+        <button type="submit" class="btn-primary" style="margin-top: 24px;">
+            💾 Save Settings
+        </button>
+    </form>
+</div>
+{% endblock %}

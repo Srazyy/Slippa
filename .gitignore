@@ -26,6 +26,7 @@ downloads/
 output/
 token.json
 client_secrets.json
+slippa_settings.json
 *.mp4
 *.mp3
 *.wav

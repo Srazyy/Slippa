@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Batch Processing — Slippa{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Batch Processing</h2>
+    <p class="subtitle">Paste multiple YouTube URLs (one per line) to process them all at once</p>
+
+    <form id="batch-form">
+        <textarea id="urls-input" class="textarea" rows="6" placeholder="https://www.youtube.com/watch?v=abc123
+https://www.youtube.com/watch?v=def456
+https://www.youtube.com/watch?v=ghi789"></textarea>
+        <button type="submit" class="btn-primary" id="batch-btn" style="margin-top: 16px; width: 100%;">
+            🚀 Process All Videos
+        </button>
+    </form>
+</div>
+
+<div class="hidden" id="batch-progress">
+    <div class="results-header">
+        <h2>Batch Progress</h2>
+        <span class="status-text" id="batch-status">Starting...</span>
+    </div>
+    <div id="batch-jobs" class="batch-grid"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const batchForm = document.getElementById('batch-form');
+    const batchProgress = document.getElementById('batch-progress');
+    const batchJobs = document.getElementById('batch-jobs');
+    const batchStatus = document.getElementById('batch-status');
+
+    batchForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const urls = document.getElementById('urls-input').value.trim();
+        if (!urls) return;
+
+        document.getElementById('batch-btn').disabled = true;
+        document.getElementById('batch-btn').textContent = '⏳ Processing...';
+        batchProgress.classList.remove('hidden');
+
+        const res = await fetch('/batch-process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `urls=${encodeURIComponent(urls)}`
+        });
+        const data = await res.json();
+        if (data.error) { batchStatus.textContent = data.error; return; }
+
+        // Show job cards
+        batchJobs.innerHTML = '';
+        data.job_ids.forEach((id, i) => {
+            const card = document.createElement('div');
+            card.className = 'batch-card';
+            card.id = `batch-${id}`;
+            card.innerHTML = `
+            <div class="batch-card-header">
+                <span class="batch-num">#${i + 1}</span>
+                <span class="batch-card-status" id="bstatus-${id}">⏳ Queued</span>
+            </div>
+            <p class="batch-card-title" id="btitle-${id}">Waiting...</p>
+            <p class="batch-card-progress" id="bprog-${id}">—</p>
+        `;
+            batchJobs.appendChild(card);
+        });
+
+        // Poll all jobs
+        let done = 0;
+        const total = data.job_ids.length;
+        batchStatus.textContent = `0 / ${total} complete`;
+
+        const interval = setInterval(async () => {
+            done = 0;
+            for (const id of data.job_ids) {
+                const r = await fetch(`/status/${id}`);
+                const j = await r.json();
+
+                const statusEl = document.getElementById(`bstatus-${id}`);
+                const titleEl = document.getElementById(`btitle-${id}`);
+                const progEl = document.getElementById(`bprog-${id}`);
+                const cardEl = document.getElementById(`batch-${id}`);
+
+                if (j.video_title) titleEl.textContent = j.video_title;
+                progEl.textContent = j.progress;
+
+                if (j.status === 'done') {
+                    done++;
+                    statusEl.textContent = `✅ ${j.clips?.length || 0} clips`;
+                    cardEl.classList.add('batch-done');
+                    if (j.clips?.length > 0) {
+                        titleEl.innerHTML = `<a href="/results/${id}" class="batch-link">${j.video_title} →</a>`;
+                    }
+                } else if (j.status === 'error') {
+                    done++;
+                    statusEl.textContent = '❌ Error';
+                    cardEl.classList.add('batch-error');
+                } else if (j.status !== 'queued') {
+                    statusEl.textContent = '🔄 Processing';
+                    cardEl.classList.add('batch-active');
+                }
+            }
+
+            batchStatus.textContent = `${done} / ${total} complete`;
+            if (done === total) {
+                clearInterval(interval);
+                batchStatus.textContent = `All ${total} videos processed!`;
+                document.getElementById('batch-btn').disabled = false;
+                document.getElementById('batch-btn').textContent = '🚀 Process All Videos';
+            }
+        }, 2000);
+    });
+</script>
+{% endblock %}

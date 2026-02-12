@@ -1,193 +1,97 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
+{% block title %}Results — Slippa{% endblock %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Results — Slippa</title>
-    <link rel="stylesheet" href="/static/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-</head>
-
-<body>
-    <div class="app">
-        <header class="header">
-            <a href="/" style="text-decoration: none;">
-                <div class="logo">
-                    <span class="logo-icon">✂️</span>
-                    <span class="logo-text">Slippa</span>
-                </div>
-            </a>
-        </header>
-
-        <main class="main">
-            {% if job.status == 'done' and job.clips %}
-            <div class="results-header">
-                <h2>{{ job.clips | length }} Clips from "{{ job.video_title }}"</h2>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-secondary" id="yt-auth-btn" style="display: none;">🔑 Connect YouTube</button>
-                    <a href="/" class="btn-secondary">+ New Video</a>
-                </div>
-            </div>
-
-            <div class="clips-grid">
-                {% for clip in job.clips %}
-                <div class="clip-card" id="clip-card-{{ loop.index }}">
-                    <div class="clip-preview">
-                        <video controls preload="metadata">
-                            <source src="/clips/{{ job_id }}/{{ clip.filename }}" type="video/mp4">
-                        </video>
-                    </div>
-                    <div class="clip-info">
-                        <div class="clip-header">
-                            <h3>Clip {{ clip.index }}</h3>
-                            <span class="clip-badge">{{ clip.duration }}s</span>
-                        </div>
-                        <p class="clip-time">{{ clip.start }}s → {{ clip.end }}s</p>
-                        <p class="clip-transcript">{{ clip.text }}</p>
-                        <div class="clip-meta">
-                            <span class="clip-score">Score: {{ clip.score }}</span>
-                            <span class="clip-size">{{ clip.size_kb }} KB</span>
-                        </div>
-                        <div class="clip-actions">
-                            <a href="/download/{{ job_id }}/{{ clip.filename }}" class="btn-download">
-                                ⬇ Download
-                            </a>
-                            <button class="btn-upload" data-filename="{{ clip.filename }}" data-index="{{ clip.index }}"
-                                onclick="uploadClip(this, '{{ job_id }}', '{{ clip.filename }}', 'Clip {{ clip.index }} - {{ job.video_title }}')">
-                                📤 Upload to YouTube
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-            {% elif job.status == 'error' %}
-            <div class="card">
-                <h2>Something went wrong</h2>
-                <p class="status-text" style="color: var(--error);">{{ job.progress }}</p>
-                <a href="/" class="btn-secondary" style="margin-top: 16px; display: inline-block;">Try Again</a>
-            </div>
-            {% else %}
-            <div class="card">
-                <h2>Processing...</h2>
-                <p class="status-text">{{ job.progress }}</p>
-                <script>setTimeout(() => location.reload(), 2000);</script>
-            </div>
-            {% endif %}
-        </main>
-
-        <footer class="footer">
-            <p>Built with ❤️ — 100% local, 0% cloud</p>
-        </footer>
+{% block content %}
+{% if job.status == 'done' and job.clips %}
+<div class="results-header">
+    <h2>{{ job.clips | length }} Clips from "{{ job.video_title }}"</h2>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn-secondary" id="yt-auth-btn" style="display: none;">🔑 Connect YouTube</button>
+        <a href="/" class="btn-secondary">+ New Video</a>
     </div>
+</div>
 
-    <script>
-        let ytAuthenticated = false;
+<div class="clips-grid">
+    {% for clip in job.clips %}
+    <div class="clip-card" id="clip-card-{{ loop.index }}">
+        <div class="clip-preview">
+            <video controls preload="metadata">
+                <source src="/clips/{{ job_id }}/{{ clip.filename }}" type="video/mp4">
+            </video>
+        </div>
+        <div class="clip-info">
+            <div class="clip-header">
+                <h3>Clip {{ clip.index }}</h3>
+                <span class="clip-badge">{{ clip.duration }}s</span>
+            </div>
+            <p class="clip-time">{{ clip.start }}s → {{ clip.end }}s</p>
+            <p class="clip-transcript">{{ clip.text }}</p>
+            <div class="clip-meta">
+                <span class="clip-score">Score: {{ clip.score }}</span>
+                <span class="clip-size">{{ clip.size_kb }} KB</span>
+            </div>
+            <div class="clip-actions">
+                <a href="/download/{{ job_id }}/{{ clip.filename }}" class="btn-download">⬇ Download</a>
+                <button class="btn-upload"
+                    onclick="uploadClip(this, '{{ job_id }}', '{{ clip.filename }}', 'Clip {{ clip.index }} - {{ job.video_title }}')">
+                    📤 YouTube
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% elif job.status == 'error' %}
+<div class="card">
+    <h2>Something went wrong</h2>
+    <p class="status-text" style="color: var(--error);">{{ job.progress }}</p>
+    <a href="/" class="btn-secondary" style="margin-top: 16px; display: inline-block;">Try Again</a>
+</div>
+{% else %}
+<div class="card">
+    <h2>Processing...</h2>
+    <p class="status-text">{{ job.progress }}</p>
+    <script>setTimeout(() => location.reload(), 2000);</script>
+</div>
+{% endif %}
+{% endblock %}
 
-        // Check YouTube auth status on load
-        async function checkYouTubeStatus() {
-            try {
-                const res = await fetch('/youtube/status');
-                const data = await res.json();
+{% block scripts %}
+<script>
+    let ytAuth = false;
+    async function checkYouTubeStatus() {
+        try {
+            const r = await fetch('/youtube/status');
+            const d = await r.json();
+            if (!d.configured) {
+                document.querySelectorAll('.btn-upload').forEach(b => { b.textContent = '⚠️ Setup'; b.disabled = true; b.classList.add('btn-disabled'); });
+            } else if (!d.authenticated) {
                 const authBtn = document.getElementById('yt-auth-btn');
+                if (authBtn) { authBtn.style.display = 'inline-flex'; authBtn.onclick = () => window.location.href = '/youtube/auth'; }
+            } else { ytAuth = true; }
+        } catch (e) { }
+    }
 
-                if (!data.configured) {
-                    // Hide upload buttons, show setup message
-                    document.querySelectorAll('.btn-upload').forEach(btn => {
-                        btn.textContent = '⚠️ Setup Required';
-                        btn.disabled = true;
-                        btn.title = 'Place client_secrets.json in the Slippa folder';
-                        btn.classList.add('btn-disabled');
-                    });
-                } else if (!data.authenticated) {
-                    authBtn.style.display = 'inline-flex';
-                    authBtn.onclick = () => window.location.href = '/youtube/auth';
-                } else {
-                    ytAuthenticated = true;
-                }
-            } catch (e) {
-                console.error('Failed to check YouTube status:', e);
-            }
-        }
+    async function uploadClip(btn, jobId, filename, title) {
+        if (!ytAuth) { if (confirm('Connect YouTube first?')) window.location.href = '/youtube/auth'; return; }
+        btn.disabled = true; btn.textContent = '⏳...'; btn.classList.add('btn-uploading');
+        const res = await fetch('/upload', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ job_id: jobId, filename, title, description: 'Generated by Slippa', privacy: 'private' })
+        });
+        const data = await res.json();
+        if (data.need_auth) { window.location.href = '/youtube/auth'; return; }
+        if (data.error) { btn.textContent = '❌ Error'; btn.classList.remove('btn-uploading'); return; }
+        const iv = setInterval(async () => {
+            const r = await fetch(`/upload-status/${data.upload_id}`);
+            const d = await r.json();
+            if (d.status === 'done') {
+                clearInterval(iv); btn.textContent = '✅ Done'; btn.classList.remove('btn-uploading'); btn.classList.add('btn-uploaded');
+                if (d.result?.url) { const a = document.createElement('a'); a.href = d.result.url; a.target = '_blank'; a.className = 'yt-link'; a.textContent = '🔗 View'; btn.parentElement.appendChild(a); }
+            } else if (d.status === 'error') { clearInterval(iv); btn.textContent = '❌'; btn.classList.remove('btn-uploading'); }
+        }, 2000);
+    }
 
-        async function uploadClip(btn, jobId, filename, title) {
-            if (!ytAuthenticated) {
-                if (confirm('You need to connect your YouTube account first. Go to login?')) {
-                    window.location.href = '/youtube/auth';
-                }
-                return;
-            }
-
-            btn.disabled = true;
-            btn.textContent = '⏳ Uploading...';
-            btn.classList.add('btn-uploading');
-
-            try {
-                const res = await fetch('/upload', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        job_id: jobId,
-                        filename: filename,
-                        title: title,
-                        description: `Generated by Slippa — AI-powered clip generator`,
-                        privacy: 'private',
-                    }),
-                });
-
-                const data = await res.json();
-
-                if (data.need_auth) {
-                    window.location.href = '/youtube/auth';
-                    return;
-                }
-
-                if (data.error) {
-                    btn.textContent = '❌ Error';
-                    btn.classList.remove('btn-uploading');
-                    alert(data.error);
-                    return;
-                }
-
-                // Poll upload status
-                pollUpload(data.upload_id, btn);
-            } catch (e) {
-                btn.textContent = '❌ Failed';
-                btn.classList.remove('btn-uploading');
-            }
-        }
-
-        async function pollUpload(uploadId, btn) {
-            const interval = setInterval(async () => {
-                const res = await fetch(`/upload-status/${uploadId}`);
-                const data = await res.json();
-
-                if (data.status === 'done') {
-                    clearInterval(interval);
-                    btn.textContent = '✅ Uploaded!';
-                    btn.classList.remove('btn-uploading');
-                    btn.classList.add('btn-uploaded');
-
-                    if (data.result && data.result.url) {
-                        const link = document.createElement('a');
-                        link.href = data.result.url;
-                        link.target = '_blank';
-                        link.className = 'yt-link';
-                        link.textContent = '🔗 View on YouTube';
-                        btn.parentElement.appendChild(link);
-                    }
-                } else if (data.status === 'error') {
-                    clearInterval(interval);
-                    btn.textContent = '❌ Failed';
-                    btn.classList.remove('btn-uploading');
-                    btn.title = data.progress;
-                }
-            }, 2000);
-        }
-
-        checkYouTubeStatus();
-    </script>
-</body>
-
-</html>
+    checkYouTubeStatus();
+</script>
+{% endblock %}
