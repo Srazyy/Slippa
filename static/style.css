@@ -4,7 +4,9 @@
    ============================================ */
 
 /* --- Reset & Base --- */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -58,14 +60,19 @@ body::before {
     width: 200%;
     height: 200%;
     background: radial-gradient(circle at 30% 20%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
-                radial-gradient(circle at 70% 80%, rgba(99, 102, 241, 0.04) 0%, transparent 50%);
+        radial-gradient(circle at 70% 80%, rgba(99, 102, 241, 0.04) 0%, transparent 50%);
     z-index: -1;
     animation: bgShift 20s ease-in-out infinite alternate;
 }
 
 @keyframes bgShift {
-    0% { transform: translate(0, 0); }
-    100% { transform: translate(-5%, 5%); }
+    0% {
+        transform: translate(0, 0);
+    }
+
+    100% {
+        transform: translate(-5%, 5%);
+    }
 }
 
 /* --- Layout --- */
@@ -217,7 +224,9 @@ body::before {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .status-text {
@@ -285,8 +294,15 @@ body::before {
 }
 
 @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 12px rgba(139, 92, 246, 0.3); }
-    50% { box-shadow: 0 0 20px rgba(139, 92, 246, 0.6); }
+
+    0%,
+    100% {
+        box-shadow: 0 0 12px rgba(139, 92, 246, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 0 20px rgba(139, 92, 246, 0.6);
+    }
 }
 
 .step span {
@@ -460,6 +476,85 @@ body::before {
 .btn-download:hover {
     box-shadow: 0 4px 14px rgba(139, 92, 246, 0.3);
     transform: translateY(-1px);
+}
+
+/* --- Upload Buttons --- */
+.clip-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.clip-actions .btn-download {
+    flex: 1;
+}
+
+.btn-upload {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px;
+    background: transparent;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: var(--radius-xs);
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.btn-upload:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+}
+
+.btn-uploading {
+    color: var(--warning) !important;
+    border-color: rgba(245, 158, 11, 0.3) !important;
+    cursor: wait;
+    animation: uploadPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes uploadPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+}
+
+.btn-uploaded {
+    color: var(--success) !important;
+    border-color: rgba(16, 185, 129, 0.3) !important;
+    cursor: default;
+}
+
+.btn-disabled {
+    opacity: 0.4;
+    cursor: not-allowed !important;
+}
+
+.yt-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    color: var(--accent-light);
+    font-size: 12px;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.yt-link:hover {
+    color: var(--text-primary);
 }
 
 /* --- Footer --- */
