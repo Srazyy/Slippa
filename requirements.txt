@@ -10,8 +10,8 @@ google-api-python-client>=2.0.0
 google-auth-oauthlib>=1.0.0
 google-auth-httplib2>=0.1.0
 
-# Web UI (Phase 3)
-# flask>=3.0.0
+# Web UI
+flask>=3.0.0
 
 # Utilities
 rich>=13.0.0                 # Beautiful terminal output
