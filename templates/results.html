@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Results — Slippa</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app">
+        <header class="header">
+            <a href="/" style="text-decoration: none;">
+                <div class="logo">
+                    <span class="logo-icon">✂️</span>
+                    <span class="logo-text">Slippa</span>
+                </div>
+            </a>
+        </header>
+
+        <main class="main">
+            {% if job.status == 'done' and job.clips %}
+            <div class="results-header">
+                <h2>{{ job.clips | length }} Clips from "{{ job.video_title }}"</h2>
+                <a href="/" class="btn-secondary">+ New Video</a>
+            </div>
+
+            <div class="clips-grid">
+                {% for clip in job.clips %}
+                <div class="clip-card">
+                    <div class="clip-preview">
+                        <video controls preload="metadata">
+                            <source src="/clips/{{ job_id }}/{{ clip.filename }}" type="video/mp4">
+                        </video>
+                    </div>
+                    <div class="clip-info">
+                        <div class="clip-header">
+                            <h3>Clip {{ clip.index }}</h3>
+                            <span class="clip-badge">{{ clip.duration }}s</span>
+                        </div>
+                        <p class="clip-time">{{ clip.start }}s → {{ clip.end }}s</p>
+                        <p class="clip-transcript">{{ clip.text }}</p>
+                        <div class="clip-meta">
+                            <span class="clip-score">Score: {{ clip.score }}</span>
+                            <span class="clip-size">{{ clip.size_kb }} KB</span>
+                        </div>
+                        <a href="/download/{{ job_id }}/{{ clip.filename }}" class="btn-download">
+                            ⬇ Download
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% elif job.status == 'error' %}
+            <div class="card">
+                <h2>Something went wrong</h2>
+                <p class="status-text" style="color: var(--error);">{{ job.progress }}</p>
+                <a href="/" class="btn-secondary" style="margin-top: 16px; display: inline-block;">Try Again</a>
+            </div>
+            {% else %}
+            <div class="card">
+                <h2>Processing...</h2>
+                <p class="status-text">{{ job.progress }}</p>
+                <script>setTimeout(() => location.reload(), 2000);</script>
+            </div>
+            {% endif %}
+        </main>
+
+        <footer class="footer">
+            <p>Built with ❤️ — 100% local, 0% cloud</p>
+        </footer>
+    </div>
+</body>
+
+</html>

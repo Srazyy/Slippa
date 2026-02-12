@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slippa — AI Video Clipper</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">✂️</span>
+                <span class="logo-text">Slippa</span>
+            </div>
+            <p class="tagline">AI-powered clip generator — runs 100% locally</p>
+        </header>
+
+        <!-- Main Card -->
+        <main class="main">
+            <div class="card" id="input-card">
+                <h2>Drop a video, get clips</h2>
+                <p class="subtitle">Paste a YouTube URL or enter a local file path</p>
+
+                <form id="process-form">
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            id="source-input"
+                            name="source"
+                            placeholder="https://www.youtube.com/watch?v=..."
+                            autocomplete="off"
+                            spellcheck="false"
+                        >
+                        <button type="submit" id="submit-btn">
+                            <span class="btn-text">Generate Clips</span>
+                            <span class="btn-icon">→</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Processing Card (hidden initially) -->
+            <div class="card hidden" id="processing-card">
+                <div class="processing-header">
+                    <div class="spinner"></div>
+                    <h2 id="processing-title">Processing...</h2>
+                </div>
+                <p id="processing-status" class="status-text">Starting...</p>
+
+                <div class="progress-steps">
+                    <div class="step" id="step-download">
+                        <div class="step-dot"></div>
+                        <span>Download</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="step-transcribe">
+                        <div class="step-dot"></div>
+                        <span>Transcribe</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="step-analyze">
+                        <div class="step-dot"></div>
+                        <span>Analyze</span>
+                    </div>
+                    <div class="step-line"></div>
+                    <div class="step" id="step-cut">
+                        <div class="step-dot"></div>
+                        <span>Cut</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results (hidden initially) -->
+            <div class="hidden" id="results-section">
+                <div class="results-header">
+                    <h2 id="results-title">Your Clips</h2>
+                    <button class="btn-secondary" id="new-video-btn">+ New Video</button>
+                </div>
+                <div id="clips-grid" class="clips-grid"></div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>Built with ❤️ — 100% local, 0% cloud</p>
+        </footer>
+    </div>
+
+    <script>
+        const form = document.getElementById('process-form');
+        const inputCard = document.getElementById('input-card');
+        const processingCard = document.getElementById('processing-card');
+        const resultsSection = document.getElementById('results-section');
+        const statusText = document.getElementById('processing-status');
+        const processingTitle = document.getElementById('processing-title');
+        const clipsGrid = document.getElementById('clips-grid');
+        const submitBtn = document.getElementById('submit-btn');
+        const newVideoBtn = document.getElementById('new-video-btn');
+
+        const stepMap = {
+            'downloading': 'step-download',
+            'transcribing': 'step-transcribe',
+            'analyzing': 'step-analyze',
+            'cutting': 'step-cut',
+            'done': null,
+            'error': null,
+        };
+
+        // Which steps are "complete" once we reach a given status
+        const completedSteps = {
+            'downloading': [],
+            'transcribing': ['step-download'],
+            'analyzing': ['step-download', 'step-transcribe'],
+            'cutting': ['step-download', 'step-transcribe', 'step-analyze'],
+            'done': ['step-download', 'step-transcribe', 'step-analyze', 'step-cut'],
+        };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const source = document.getElementById('source-input').value.trim();
+            if (!source) return;
+
+            // Show processing card
+            inputCard.classList.add('hidden');
+            processingCard.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            resetSteps();
+
+            // Start processing
+            const res = await fetch('/process', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: `source=${encodeURIComponent(source)}`
+            });
+
+            const data = await res.json();
+            if (data.error) {
+                statusText.textContent = data.error;
+                return;
+            }
+
+            // Poll for status
+            pollStatus(data.job_id);
+        });
+
+        newVideoBtn.addEventListener('click', () => {
+            inputCard.classList.remove('hidden');
+            processingCard.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            document.getElementById('source-input').value = '';
+            document.getElementById('source-input').focus();
+        });
+
+        function resetSteps() {
+            document.querySelectorAll('.step').forEach(s => {
+                s.classList.remove('active', 'done');
+            });
+            document.querySelectorAll('.step-line').forEach(l => {
+                l.classList.remove('active');
+            });
+        }
+
+        function updateSteps(status) {
+            resetSteps();
+
+            // Mark completed steps
+            const completed = completedSteps[status] || [];
+            completed.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('done');
+            });
+
+            // Mark active step
+            const activeId = stepMap[status];
+            if (activeId) {
+                const el = document.getElementById(activeId);
+                if (el) el.classList.add('active');
+            }
+
+            // Animate connecting lines
+            const lines = document.querySelectorAll('.step-line');
+            const stepOrder = ['step-download', 'step-transcribe', 'step-analyze', 'step-cut'];
+            const activeIndex = stepOrder.indexOf(activeId);
+            lines.forEach((line, i) => {
+                if (i < activeIndex || (status === 'done' && i < lines.length)) {
+                    line.classList.add('active');
+                }
+            });
+        }
+
+        async function pollStatus(jobId) {
+            const interval = setInterval(async () => {
+                const res = await fetch(`/status/${jobId}`);
+                const data = await res.json();
+
+                statusText.textContent = data.progress;
+                updateSteps(data.status);
+
+                if (data.status === 'done') {
+                    clearInterval(interval);
+                    processingCard.classList.add('hidden');
+
+                    if (data.clips && data.clips.length > 0) {
+                        showResults(jobId, data);
+                    } else {
+                        // No clips found — show message
+                        inputCard.classList.remove('hidden');
+                        statusText.textContent = 'No clips found. Try a longer video.';
+                    }
+                }
+
+                if (data.status === 'error') {
+                    clearInterval(interval);
+                    processingTitle.textContent = 'Error';
+                    document.querySelector('.spinner').style.display = 'none';
+                }
+            }, 1500);
+        }
+
+        function showResults(jobId, data) {
+            resultsSection.classList.remove('hidden');
+            document.getElementById('results-title').textContent =
+                `${data.clips.length} Clips from "${data.video_title}"`;
+
+            clipsGrid.innerHTML = '';
+            data.clips.forEach(clip => {
+                const card = document.createElement('div');
+                card.className = 'clip-card';
+                card.innerHTML = `
+                    <div class="clip-preview">
+                        <video controls preload="metadata">
+                            <source src="/clips/${jobId}/${clip.filename}" type="video/mp4">
+                        </video>
+                    </div>
+                    <div class="clip-info">
+                        <div class="clip-header">
+                            <h3>Clip ${clip.index}</h3>
+                            <span class="clip-badge">${clip.duration}s</span>
+                        </div>
+                        <p class="clip-time">${clip.start}s → ${clip.end}s</p>
+                        <p class="clip-transcript">${clip.text}</p>
+                        <div class="clip-meta">
+                            <span class="clip-score">Score: ${clip.score}</span>
+                            <span class="clip-size">${clip.size_kb} KB</span>
+                        </div>
+                        <a href="/download/${jobId}/${clip.filename}" class="btn-download">
+                            ⬇ Download
+                        </a>
+                    </div>
+                `;
+                clipsGrid.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
