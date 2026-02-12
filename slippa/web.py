@@ -32,6 +32,7 @@ from slippa.transcriber import transcribe_audio
 from slippa.clipper import find_clips
 from slippa.cutter import cut_clips
 from slippa import uploader
+from slippa import database as db
 from config import settings as config
 
 app = Flask(
@@ -40,43 +41,40 @@ app = Flask(
     static_folder=os.path.join(os.path.dirname(__file__), "..", "static"),
 )
 
-# In-memory job stores
-jobs = {}
-upload_jobs = {}
+# Initialise database on import
+db.init_db()
 
-CLIPS_BASE_DIR = "clips"
-DOWNLOADS_DIR = "downloads"
+# In-memory cache for active processing threads + upload jobs
+_active_jobs = {}
+upload_jobs = {}
 
 
 def _process_video(job_id: str, source: str):
     """Background thread: runs the full pipeline for one video."""
-    job = jobs[job_id]
     settings = config.load_settings()
 
     try:
         # Step 1: Download
-        job["status"] = "downloading"
-        job["progress"] = "Downloading video..."
+        db.update_job(job_id, status="downloading", progress="Downloading video...")
 
         if source.startswith(("http://", "https://", "www.")):
             video_path = download_video(source, output_dir=settings["download_dir"])
         else:
             video_path = source
 
-        job["video_title"] = os.path.splitext(os.path.basename(video_path))[0]
-        job["source"] = source
-        job["progress"] = f"Downloaded: {job['video_title']}"
+        title = os.path.splitext(os.path.basename(video_path))[0]
+        db.update_job(job_id, video_title=title, progress=f"Downloaded: {title}")
 
         # Step 2: Transcribe
-        job["status"] = "transcribing"
-        job["progress"] = f"Transcribing with Whisper ({settings['whisper_model']})..."
+        db.update_job(job_id, status="transcribing",
+                      progress=f"Transcribing with Whisper ({settings['whisper_model']})...")
 
         segments = transcribe_audio(video_path, model_size=settings["whisper_model"])
-        job["progress"] = f"Transcribed {len(segments)} segments"
+        db.update_job(job_id, progress=f"Transcribed {len(segments)} segments")
 
         # Step 3: Find clips
-        job["status"] = "analyzing"
-        job["progress"] = "Analyzing transcript for best clips..."
+        db.update_job(job_id, status="analyzing",
+                      progress="Analyzing transcript for best clips...")
 
         clips = find_clips(
             segments,
@@ -84,17 +82,16 @@ def _process_video(job_id: str, source: str):
             max_duration=settings["max_clip_duration"],
             max_clips=settings["max_clips"],
         )
-        job["progress"] = f"Found {len(clips)} clips"
+        db.update_job(job_id, progress=f"Found {len(clips)} clips")
 
         if not clips:
-            job["status"] = "done"
-            job["progress"] = "No clips found in this video."
-            job["clips"] = []
+            db.update_job(job_id, status="done",
+                          progress="No clips found in this video.", clips=[])
             return
 
         # Step 4: Cut clips
-        job["status"] = "cutting"
-        job["progress"] = "Cutting clips with ffmpeg..."
+        db.update_job(job_id, status="cutting",
+                      progress="Cutting clips with ffmpeg...")
 
         clip_output_dir = os.path.join(settings["clips_dir"], job_id)
         clip_paths = cut_clips(video_path, clips, output_dir=clip_output_dir)
@@ -113,14 +110,11 @@ def _process_video(job_id: str, source: str):
                 "size_kb": round(os.path.getsize(path) / 1024, 1),
             })
 
-        job["clips"] = clip_info
-        job["status"] = "done"
-        job["progress"] = f"Done! {len(clip_info)} clips ready."
+        db.update_job(job_id, status="done",
+                      progress=f"Done! {len(clip_info)} clips ready.", clips=clip_info)
 
     except Exception as e:
-        job["status"] = "error"
-        job["progress"] = f"Error: {str(e)}"
-        job["error"] = str(e)
+        db.update_job(job_id, status="error", progress=f"Error: {str(e)}", error=str(e))
 
 
 # ---- Page Routes ----
@@ -137,12 +131,7 @@ def batch_page():
 
 @app.route("/history")
 def history_page():
-    # Sort jobs by time (newest first)
-    sorted_jobs = sorted(
-        jobs.items(),
-        key=lambda x: x[1].get("created_at", ""),
-        reverse=True,
-    )
+    sorted_jobs = db.list_jobs()
     return render_template("history.html", page="history", jobs=sorted_jobs)
 
 
@@ -182,15 +171,7 @@ def process():
         return jsonify({"error": "No source provided"}), 400
 
     job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
-        "status": "starting",
-        "progress": "Starting...",
-        "clips": [],
-        "video_title": "",
-        "source": source,
-        "error": None,
-        "created_at": datetime.now().isoformat(),
-    }
+    db.create_job(job_id, source)
 
     thread = threading.Thread(target=_process_video, args=(job_id, source))
     thread.daemon = True
@@ -213,22 +194,14 @@ def batch_process():
     job_ids = []
     for url in urls:
         job_id = str(uuid.uuid4())[:8]
-        jobs[job_id] = {
-            "status": "queued",
-            "progress": "Queued...",
-            "clips": [],
-            "video_title": "",
-            "source": url,
-            "error": None,
-            "created_at": datetime.now().isoformat(),
-            "batch": True,
-        }
+        db.create_job(job_id, url, batch=True)
         job_ids.append(job_id)
 
-    # Process sequentially in a background thread to avoid overload
+    # Process sequentially in a background thread
     def _batch_runner(ids):
         for jid in ids:
-            _process_video(jid, jobs[jid]["source"])
+            job = db.get_job(jid)
+            _process_video(jid, job["source"])
 
     thread = threading.Thread(target=_batch_runner, args=(job_ids,))
     thread.daemon = True
@@ -239,7 +212,7 @@ def batch_process():
 
 @app.route("/status/<job_id>")
 def status(job_id):
-    job = jobs.get(job_id)
+    job = db.get_job(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
     return jsonify(job)
@@ -247,7 +220,7 @@ def status(job_id):
 
 @app.route("/results/<job_id>")
 def results(job_id):
-    job = jobs.get(job_id)
+    job = db.get_job(job_id)
     if not job:
         return redirect(url_for("index"))
     return render_template("results.html", job_id=job_id, job=job, page="home")
@@ -255,13 +228,15 @@ def results(job_id):
 
 @app.route("/clips/<job_id>/<filename>")
 def serve_clip(job_id, filename):
-    clip_dir = os.path.join(os.getcwd(), CLIPS_BASE_DIR, job_id)
+    settings = config.load_settings()
+    clip_dir = os.path.join(os.getcwd(), settings["clips_dir"], job_id)
     return send_from_directory(clip_dir, filename)
 
 
 @app.route("/download/<job_id>/<filename>")
 def download_clip(job_id, filename):
-    clip_dir = os.path.join(os.getcwd(), CLIPS_BASE_DIR, job_id)
+    settings = config.load_settings()
+    clip_dir = os.path.join(os.getcwd(), settings["clips_dir"], job_id)
     return send_from_directory(clip_dir, filename, as_attachment=True)
 
 
@@ -308,7 +283,7 @@ def upload_clip_to_youtube():
     if not uploader.is_authenticated():
         return jsonify({"error": "Not authenticated.", "need_auth": True}), 401
 
-    clip_path = os.path.join(os.getcwd(), CLIPS_BASE_DIR, job_id, filename)
+    clip_path = os.path.join(os.getcwd(), config.load_settings()["clips_dir"], job_id, filename)
     if not os.path.exists(clip_path):
         return jsonify({"error": "Clip file not found"}), 404
 
