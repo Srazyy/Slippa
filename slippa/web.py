@@ -73,14 +73,19 @@ def _process_video(job_id: str, source: str):
         db.update_job(job_id, progress=f"Transcribed {len(segments)} segments")
 
         # Step 3: Find clips
+        smart_scoring = settings.get("smart_scoring", True)
+        scoring_mode = "smart AI" if smart_scoring else "legacy"
         db.update_job(job_id, status="analyzing",
-                      progress="Analyzing transcript for best clips...")
+                      progress=f"Analyzing transcript ({scoring_mode} scoring)...")
 
         clips = find_clips(
             segments,
             min_duration=settings["min_clip_duration"],
             max_duration=settings["max_clip_duration"],
             max_clips=settings["max_clips"],
+            smart_edit=settings.get("smart_edit", False),
+            gap_threshold=settings.get("gap_threshold", 0.8),
+            smart_scoring=smart_scoring,
         )
         db.update_job(job_id, progress=f"Found {len(clips)} clips")
 
@@ -94,7 +99,12 @@ def _process_video(job_id: str, source: str):
                       progress="Cutting clips with ffmpeg...")
 
         clip_output_dir = os.path.join(settings["clips_dir"], job_id)
-        clip_paths = cut_clips(video_path, clips, output_dir=clip_output_dir)
+        clip_paths = cut_clips(
+            video_path, clips,
+            output_dir=clip_output_dir,
+            smart_edit=settings.get("smart_edit", False),
+            output_format=settings.get("output_format", "horizontal"),
+        )
 
         clip_info = []
         for i, (path, clip_data) in enumerate(zip(clip_paths, clips)):
@@ -106,6 +116,8 @@ def _process_video(job_id: str, source: str):
                 "end": round(clip_data["end"], 1),
                 "duration": round(duration, 1),
                 "score": clip_data["score"],
+                "label": clip_data.get("label", "—"),
+                "score_breakdown": clip_data.get("score_breakdown", {}),
                 "text": clip_data.get("text", "")[:200],
                 "size_kb": round(os.path.getsize(path) / 1024, 1),
             })
@@ -154,7 +166,11 @@ def save_settings_route():
         "max_clip_duration": int(request.form.get("max_clip_duration", 90)),
         "target_clip_duration": int(request.form.get("target_clip_duration", 45)),
         "max_clips": int(request.form.get("max_clips", 10)),
+        "smart_edit": request.form.get("smart_edit") == "on",
+        "gap_threshold": float(request.form.get("gap_threshold", 0.8)),
+        "output_format": request.form.get("output_format", "horizontal"),
         "default_privacy": request.form.get("default_privacy", "private"),
+        "smart_scoring": request.form.get("smart_scoring") == "on",
     }
     current = config.load_settings()
     current.update(new_settings)

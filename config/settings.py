@@ -20,6 +20,10 @@ DEFAULTS = {
     "default_privacy": "private",
     "download_dir": "downloads",
     "clips_dir": "clips",
+    "smart_edit": True,
+    "gap_threshold": 0.8,
+    "output_format": "horizontal",  # "horizontal" | "vertical" | "both"
+    "smart_scoring": True,           # NLP-powered clip scoring
 }
 
 # Available Whisper models for the settings UI

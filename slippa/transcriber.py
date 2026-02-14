@@ -62,17 +62,29 @@ def transcribe_audio(
         video_path,
         beam_size=5,          # Higher = more accurate, slower
         vad_filter=True,      # Voice Activity Detection — skips silent parts
+        word_timestamps=True, # Word-level timestamps for smart editing
     )
 
     print(f"  Detected language: {info.language} (confidence: {info.language_probability:.0%})")
 
     # Convert generator to list of dicts
+    # Each segment now includes word-level timing when available
     segments = []
     for segment in segments_generator:
+        words = []
+        if segment.words:
+            for w in segment.words:
+                words.append({
+                    "word": w.word.strip(),
+                    "start": w.start,
+                    "end": w.end,
+                })
+
         segments.append({
             "start": segment.start,
             "end": segment.end,
             "text": segment.text.strip(),
+            "words": words,
         })
 
     return segments

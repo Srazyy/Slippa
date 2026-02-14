@@ -22,14 +22,74 @@
         <div class="clip-info">
             <div class="clip-header">
                 <h3>Clip {{ clip.index }}</h3>
-                <span class="clip-badge">{{ clip.duration }}s</span>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                    {% if clip.label and clip.label != '—' %}
+                    <span
+                        class="clip-label clip-label-{{ clip.label.split(' ')[1] | lower if clip.label.split(' ') | length > 1 else 'meh' }}">
+                        {{ clip.label }}
+                    </span>
+                    {% endif %}
+                    <span class="clip-badge">{{ clip.duration }}s</span>
+                </div>
             </div>
             <p class="clip-time">{{ clip.start }}s → {{ clip.end }}s</p>
             <p class="clip-transcript">{{ clip.text }}</p>
+
+            <!-- Smart score breakdown -->
+            {% if clip.score_breakdown %}
+            <div class="score-breakdown">
+                <div class="score-bar-row">
+                    <span class="score-label">Score</span>
+                    <div class="score-bar-track">
+                        <div class="score-bar-fill" style="width: {{ (clip.score / 10 * 100) | round }}%"></div>
+                    </div>
+                    <span class="score-value">{{ clip.score }}/10</span>
+                </div>
+                {% if clip.score_breakdown.engagement is defined %}
+                <div class="score-details" style="display: none;" id="details-{{ loop.index }}">
+                    <div class="score-bar-row mini">
+                        <span class="score-label">🎯 Engage</span>
+                        <div class="score-bar-track mini">
+                            <div class="score-bar-fill engage"
+                                style="width: {{ (clip.score_breakdown.engagement / 10 * 100) | round }}%"></div>
+                        </div>
+                        <span class="score-value">{{ clip.score_breakdown.engagement }}</span>
+                    </div>
+                    <div class="score-bar-row mini">
+                        <span class="score-label">💖 Emotion</span>
+                        <div class="score-bar-track mini">
+                            <div class="score-bar-fill emotion"
+                                style="width: {{ (clip.score_breakdown.emotion / 10 * 100) | round }}%"></div>
+                        </div>
+                        <span class="score-value">{{ clip.score_breakdown.emotion }}</span>
+                    </div>
+                    <div class="score-bar-row mini">
+                        <span class="score-label">🧩 Coherence</span>
+                        <div class="score-bar-track mini">
+                            <div class="score-bar-fill coherence"
+                                style="width: {{ (clip.score_breakdown.coherence / 10 * 100) | round }}%"></div>
+                        </div>
+                        <span class="score-value">{{ clip.score_breakdown.coherence }}</span>
+                    </div>
+                    <div class="score-bar-row mini">
+                        <span class="score-label">🚀 Viral</span>
+                        <div class="score-bar-track mini">
+                            <div class="score-bar-fill viral"
+                                style="width: {{ (clip.score_breakdown.virality / 10 * 100) | round }}%"></div>
+                        </div>
+                        <span class="score-value">{{ clip.score_breakdown.virality }}</span>
+                    </div>
+                </div>
+                <button class="btn-details" onclick="toggleDetails({{ loop.index }})">▸ Details</button>
+                {% endif %}
+            </div>
+            {% else %}
             <div class="clip-meta">
                 <span class="clip-score">Score: {{ clip.score }}</span>
                 <span class="clip-size">{{ clip.size_kb }} KB</span>
             </div>
+            {% endif %}
+
             <div class="clip-actions">
                 <a href="/download/{{ job_id }}/{{ clip.filename }}" class="btn-download">⬇ Download</a>
                 <button class="btn-upload"
@@ -41,6 +101,122 @@
     </div>
     {% endfor %}
 </div>
+
+<style>
+    .clip-label {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+
+    .clip-label-viral {
+        background: linear-gradient(135deg, #ff4500, #ff6b35);
+        color: #fff;
+    }
+
+    .clip-label-great {
+        background: linear-gradient(135deg, #f59e0b, #eab308);
+        color: #1a1a2e;
+    }
+
+    .clip-label-good {
+        background: linear-gradient(135deg, #3b82f6, #60a5fa);
+        color: #fff;
+    }
+
+    .clip-label-meh {
+        background: rgba(255, 255, 255, 0.08);
+        color: #888;
+    }
+
+    .score-breakdown {
+        margin: 10px 0 8px;
+    }
+
+    .score-bar-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+    }
+
+    .score-bar-row.mini {
+        margin-bottom: 3px;
+    }
+
+    .score-label {
+        font-size: 0.72rem;
+        color: #aaa;
+        min-width: 70px;
+        text-align: right;
+    }
+
+    .score-bar-track {
+        flex: 1;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .score-bar-track.mini {
+        height: 5px;
+    }
+
+    .score-bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+        transition: width 0.6s ease;
+    }
+
+    .score-bar-fill.engage {
+        background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    }
+
+    .score-bar-fill.emotion {
+        background: linear-gradient(90deg, #ec4899, #f472b6);
+    }
+
+    .score-bar-fill.coherence {
+        background: linear-gradient(90deg, #10b981, #34d399);
+    }
+
+    .score-bar-fill.viral {
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    }
+
+    .score-value {
+        font-size: 0.72rem;
+        color: #ccc;
+        min-width: 32px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .score-details {
+        margin-top: 6px;
+        padding: 8px 0 2px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .btn-details {
+        background: none;
+        border: none;
+        color: #8b5cf6;
+        font-size: 0.72rem;
+        cursor: pointer;
+        padding: 2px 0;
+        margin-top: 2px;
+    }
+
+    .btn-details:hover {
+        color: #a78bfa;
+    }
+</style>
+
 {% elif job.status == 'error' %}
 <div class="card">
     <h2>Something went wrong</h2>
@@ -58,6 +234,21 @@
 
 {% block scripts %}
 <script>
+    function toggleDetails(idx) {
+        const el = document.getElementById('details-' + idx);
+        const btn = el.previousElementSibling || el.parentElement.querySelector('.btn-details');
+        if (el.style.display === 'none') {
+            el.style.display = 'block';
+            // Find the button that triggered this
+            const btns = el.parentElement.querySelectorAll('.btn-details');
+            btns.forEach(b => { if (b.textContent.includes('Details')) b.textContent = '▾ Details'; });
+        } else {
+            el.style.display = 'none';
+            const btns = el.parentElement.querySelectorAll('.btn-details');
+            btns.forEach(b => b.textContent = '▸ Details');
+        }
+    }
+
     let ytAuth = false;
     async function checkYouTubeStatus() {
         try {

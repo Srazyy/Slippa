@@ -60,6 +60,62 @@
                 class="setting-input" style="max-width: 120px;">
         </div>
 
+        <!-- Smart Edit -->
+        <div class="setting-group">
+            <label class="setting-label" for="smart_edit">
+                ✂️ Smart Edit
+                <span class="setting-hint">Remove silence & dead air, merge talk segments into tighter clips</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" name="smart_edit" id="smart_edit" value="on" {% if settings.smart_edit
+                    %}checked{% endif %} style="width: 18px; height: 18px; accent-color: var(--accent, #8b5cf6);">
+                <span>Enable smart editing</span>
+            </label>
+        </div>
+
+        <!-- Gap Threshold -->
+        <div class="setting-group">
+            <label class="setting-label" for="gap_threshold">
+                ⏸️ Gap Threshold
+                <span class="setting-hint">Silence longer than this (seconds) is removed when Smart Edit is on</span>
+            </label>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <input type="range" name="gap_threshold" id="gap_threshold" value="{{ settings.gap_threshold }}"
+                    min="0.3" max="2.0" step="0.1" class="setting-input" style="max-width: 200px;"
+                    oninput="document.getElementById('gap_val').textContent = this.value + 's'">
+                <span id="gap_val" style="min-width: 32px;">{{ settings.gap_threshold }}s</span>
+            </div>
+        </div>
+
+        <!-- Output Format -->
+        <div class="setting-group">
+            <label class="setting-label" for="output_format">
+                📐 Output Format
+                <span class="setting-hint">Horizontal (16:9), Vertical (9:16 for Shorts/TikTok), or Both</span>
+            </label>
+            <select name="output_format" id="output_format" class="setting-select" style="max-width: 200px;">
+                <option value="horizontal" {% if settings.output_format=='horizontal' %}selected{% endif %}>Horizontal
+                    (16:9)</option>
+                <option value="vertical" {% if settings.output_format=='vertical' %}selected{% endif %}>Vertical (9:16)
+                </option>
+                <option value="both" {% if settings.output_format=='both' %}selected{% endif %}>Both</option>
+            </select>
+        </div>
+
+        <!-- Smart Scoring -->
+        <div class="setting-group">
+            <label class="setting-label" for="smart_scoring">
+                🧠 Smart Scoring
+                <span class="setting-hint">Use NLP to analyze what's being said, not just how much. Finds truly engaging
+                    moments.</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" name="smart_scoring" id="smart_scoring" value="on" {% if settings.smart_scoring
+                    %}checked{% endif %} style="width: 18px; height: 18px; accent-color: var(--accent, #8b5cf6);">
+                <span>Enable smart AI scoring</span>
+            </label>
+        </div>
+
         <!-- Privacy -->
         <div class="setting-group">
             <label class="setting-label" for="default_privacy">
