@@ -116,6 +116,20 @@
             </label>
         </div>
 
+        <!-- Auto Titles -->
+        <div class="setting-group">
+            <label class="setting-label" for="auto_titles">
+                ✍️ Auto-Generate Titles
+                <span class="setting-hint">Extract catchy titles and descriptions from transcript for YouTube
+                    uploads</span>
+            </label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" name="auto_titles" id="auto_titles" value="on" {% if settings.auto_titles
+                    %}checked{% endif %} style="width: 18px; height: 18px; accent-color: var(--accent, #8b5cf6);">
+                <span>Enable auto-generated titles</span>
+            </label>
+        </div>
+
         <!-- Privacy -->
         <div class="setting-group">
             <label class="setting-label" for="default_privacy">

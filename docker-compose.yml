@@ -1,0 +1,18 @@
+services:
+  slippa:
+    build: .
+    container_name: slippa
+    ports:
+      - "5000:5000"
+    volumes:
+      # Persist clips, downloads, database, and settings
+      - ./clips:/app/clips
+      - ./downloads:/app/downloads
+      - ./slippa.db:/app/slippa.db
+      - ./slippa_settings.json:/app/slippa_settings.json
+      # Mount YouTube credentials if available
+      - ./client_secrets.json:/app/client_secrets.json:ro
+      - ./token.json:/app/token.json
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped

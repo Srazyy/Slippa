@@ -1,0 +1,41 @@
+# Version control
+.git
+.gitignore
+
+# Python artifacts
+__pycache__
+*.py[cod]
+*.egg-info
+dist
+build
+venv
+.venv
+
+# IDE
+.vscode
+.idea
+.DS_Store
+
+# Runtime data (mounted as volumes)
+clips/
+downloads/
+output/
+*.mp4
+*.mp3
+*.wav
+*.webm
+*.mkv
+
+# Secrets (mounted individually)
+token.json
+client_secrets.json
+slippa_settings.json
+slippa.db
+
+# Misc
+.env
+*.env
+docs/
+tests/
+*.md
+!requirements.txt

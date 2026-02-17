@@ -24,6 +24,7 @@ DEFAULTS = {
     "gap_threshold": 0.8,
     "output_format": "horizontal",  # "horizontal" | "vertical" | "both"
     "smart_scoring": True,           # NLP-powered clip scoring
+    "auto_titles": True,             # Auto-generate clip titles from transcript
 }
 
 # Available Whisper models for the settings UI

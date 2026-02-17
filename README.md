@@ -12,10 +12,12 @@ Drop a YouTube link, get clips. No paid APIs, no cloud, no limits.
 
 - 🎬 **Download** — Grab any YouTube video via `yt-dlp`
 - 🎤 **Transcribe** — Local speech-to-text via `faster-whisper` (no API keys)
-- 🧠 **Detect Clips** — Sliding-window analysis finds the most engaging moments
+- 🧠 **Smart Scoring** — NLP-powered clip selection (engagement, emotion, coherence, virality)
+- ✍️ **Auto Titles** — Generate catchy titles & descriptions from transcripts
 - ✂️ **Cut** — Frame-perfect re-encoding via `ffmpeg`
 - 📤 **Upload** — Optional YouTube upload with OAuth2
 - 📊 **Batch** — Process multiple videos in one go
+- 🐳 **Docker** — One-command deployment
 - ⚙️ **Settings** — Whisper model, clip duration, max clips — all configurable
 - 📜 **History** — Track all processed jobs
 
@@ -35,6 +37,19 @@ pip install -r requirements.txt
 python -m slippa          # Web UI at http://localhost:5000
 python -m slippa --cli    # CLI mode
 ```
+
+### Docker (Alternative)
+
+```bash
+# Clone and run
+git clone https://github.com/Srazyy/Slippa.git
+cd Slippa
+docker compose up --build
+# → Open http://localhost:5000
+```
+
+No Python, no ffmpeg install — everything runs in the container.
+Clips, downloads, and settings persist via volume mounts.
 
 ## Prerequisites
 
@@ -79,12 +94,16 @@ Slippa/
 │   ├── transcriber.py   # faster-whisper wrapper
 │   ├── clipper.py       # Clip detection algorithm
 │   ├── cutter.py        # ffmpeg clip cutting
+│   ├── scorer.py        # NLP engagement scoring
+│   ├── titler.py        # Auto title/description generation
 │   └── uploader.py      # YouTube upload + OAuth2
 ├── config/
 │   └── settings.py      # Persistent JSON settings
 ├── templates/           # Jinja2 HTML templates
 ├── static/              # CSS styles
 ├── docs/                # Setup guides
+├── Dockerfile           # Docker deployment
+├── docker-compose.yml
 └── requirements.txt
 ```
 
