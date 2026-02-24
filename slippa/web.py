@@ -19,12 +19,14 @@ Routes:
 """
 
 import os
+import json
+import time
 import uuid
 import threading
 from datetime import datetime
 from flask import (
     Flask, render_template, request, jsonify,
-    send_from_directory, redirect, url_for
+    send_from_directory, redirect, url_for, Response
 )
 
 from slippa.downloader import download_video
@@ -56,7 +58,7 @@ def _process_video(job_id: str, source: str):
 
     try:
         # Step 1: Download
-        db.update_job(job_id, status="downloading", progress="Downloading video...")
+        db.update_job(job_id, status="downloading", progress="Downloading video...", percent=10)
 
         if source.startswith(("http://", "https://", "www.")):
             video_path = download_video(source, output_dir=settings["download_dir"])
@@ -64,20 +66,20 @@ def _process_video(job_id: str, source: str):
             video_path = source
 
         title = os.path.splitext(os.path.basename(video_path))[0]
-        db.update_job(job_id, video_title=title, progress=f"Downloaded: {title}")
+        db.update_job(job_id, video_title=title, progress=f"Downloaded: {title}", percent=20)
 
         # Step 2: Transcribe
         db.update_job(job_id, status="transcribing",
-                      progress=f"Transcribing with Whisper ({settings['whisper_model']})...")
+                      progress=f"Transcribing with Whisper ({settings['whisper_model']})...", percent=30)
 
         segments = transcribe_audio(video_path, model_size=settings["whisper_model"])
-        db.update_job(job_id, progress=f"Transcribed {len(segments)} segments")
+        db.update_job(job_id, progress=f"Transcribed {len(segments)} segments", percent=50)
 
         # Step 3: Find clips
         smart_scoring = settings.get("smart_scoring", True)
         scoring_mode = "smart AI" if smart_scoring else "legacy"
         db.update_job(job_id, status="analyzing",
-                      progress=f"Analyzing transcript ({scoring_mode} scoring)...")
+                      progress=f"Analyzing transcript ({scoring_mode} scoring)...", percent=60)
 
         clips = find_clips(
             segments,
@@ -88,16 +90,16 @@ def _process_video(job_id: str, source: str):
             gap_threshold=settings.get("gap_threshold", 0.8),
             smart_scoring=smart_scoring,
         )
-        db.update_job(job_id, progress=f"Found {len(clips)} clips")
+        db.update_job(job_id, progress=f"Found {len(clips)} clips", percent=70)
 
         if not clips:
             db.update_job(job_id, status="done",
-                          progress="No clips found in this video.", clips=[])
+                          progress="No clips found in this video.", clips=[], percent=100)
             return
 
         # Step 4: Cut clips
         db.update_job(job_id, status="cutting",
-                      progress="Cutting clips with ffmpeg...")
+                      progress="Cutting clips with ffmpeg...", percent=80)
 
         clip_output_dir = os.path.join(settings["clips_dir"], job_id)
         clip_paths = cut_clips(
@@ -138,7 +140,7 @@ def _process_video(job_id: str, source: str):
             })
 
         db.update_job(job_id, status="done",
-                      progress=f"Done! {len(clip_info)} clips ready.", clips=clip_info)
+                      progress=f"Done! {len(clip_info)} clips ready.", clips=clip_info, percent=100)
 
     except Exception as e:
         db.update_job(job_id, status="error", progress=f"Error: {str(e)}", error=str(e))
@@ -191,7 +193,7 @@ def save_settings_route():
     current = config.load_settings()
     current.update(new_settings)
     config.save_settings(current)
-    return redirect(url_for("settings_page"))
+    return redirect(url_for("settings_page") + "?saved=1")
 
 
 # ---- Processing Routes ----
@@ -248,6 +250,35 @@ def status(job_id):
     if not job:
         return jsonify({"error": "Job not found"}), 404
     return jsonify(job)
+
+
+@app.route("/stream/<job_id>")
+def stream(job_id):
+    """SSE endpoint — streams real-time progress updates for a job."""
+    def generate():
+        last_progress = None
+        while True:
+            job = db.get_job(job_id)
+            if not job:
+                yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
+                break
+            # Only send when something changed
+            current = (job["status"], job["progress"], job.get("percent", 0))
+            if current != last_progress:
+                last_progress = current
+                payload = {
+                    "status": job["status"],
+                    "progress": job["progress"],
+                    "percent": job.get("percent", 0),
+                    "video_title": job.get("video_title", ""),
+                    "clips": job.get("clips", []),
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+            if job["status"] in ("done", "error"):
+                break
+            time.sleep(0.8)
+    return Response(generate(), mimetype="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.route("/results/<job_id>")

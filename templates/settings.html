@@ -6,7 +6,7 @@
     <h2>Settings</h2>
     <p class="subtitle">Configure how Slippa processes your videos</p>
 
-    <form method="POST" action="/settings" class="settings-form">
+    <form method="POST" action="/settings" class="settings-form" id="settings-form">
         <!-- Whisper Model -->
         <div class="setting-group">
             <label class="setting-label" for="whisper_model">
@@ -144,9 +144,25 @@
             </select>
         </div>
 
-        <button type="submit" class="btn-primary" style="margin-top: 24px;">
+        <button type="submit" class="btn-primary" style="margin-top: 24px;" id="save-btn">
             💾 Save Settings
         </button>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Show save confirmation toast
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('saved') === '1') {
+        const toast = document.createElement('div');
+        toast.className = 'save-toast';
+        toast.textContent = '✅ Settings saved!';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2500);
+        // Clean URL
+        window.history.replaceState({}, '', '/settings');
+    }
+</script>
 {% endblock %}

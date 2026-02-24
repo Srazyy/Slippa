@@ -35,6 +35,7 @@ def init_db():
                 id          TEXT PRIMARY KEY,
                 status      TEXT NOT NULL DEFAULT 'starting',
                 progress    TEXT NOT NULL DEFAULT 'Starting...',
+                percent     INTEGER NOT NULL DEFAULT 0,
                 video_title TEXT DEFAULT '',
                 source      TEXT DEFAULT '',
                 error       TEXT,
@@ -43,6 +44,11 @@ def init_db():
                 created_at  TEXT NOT NULL
             )
         """)
+        # Migration: add percent column to existing databases
+        try:
+            conn.execute("ALTER TABLE jobs ADD COLUMN percent INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass  # column already exists
 
 
 def _row_to_dict(row) -> dict:
@@ -94,7 +100,7 @@ def update_job(job_id: str, **fields):
     Usage:
         update_job("abc123", status="done", progress="All done!")
     """
-    allowed = {"status", "progress", "video_title", "source", "error", "clips", "batch"}
+    allowed = {"status", "progress", "percent", "video_title", "source", "error", "clips", "batch"}
     updates = {}
     for k, v in fields.items():
         if k not in allowed:

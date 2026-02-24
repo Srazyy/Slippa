@@ -49,12 +49,15 @@ https://www.youtube.com/watch?v=ghi789"></textarea>
         const data = await res.json();
         if (data.error) { batchStatus.textContent = data.error; return; }
 
-        // Show job cards
+        // Show job cards with staggered animation
         batchJobs.innerHTML = '';
+        const sseStreams = [];
+
         data.job_ids.forEach((id, i) => {
             const card = document.createElement('div');
             card.className = 'batch-card';
             card.id = `batch-${id}`;
+            card.style.setProperty('--delay', `${i * 60}ms`);
             card.innerHTML = `
             <div class="batch-card-header">
                 <span class="batch-num">#${i + 1}</span>
@@ -62,54 +65,74 @@ https://www.youtube.com/watch?v=ghi789"></textarea>
             </div>
             <p class="batch-card-title" id="btitle-${id}">Waiting...</p>
             <p class="batch-card-progress" id="bprog-${id}">—</p>
+            <div class="progress-bar-container" style="margin: 8px 0 0;">
+                <div class="progress-bar-track" style="height: 4px;">
+                    <div class="progress-bar-fill" id="bfill-${id}" style="width: 0%"></div>
+                </div>
+            </div>
         `;
             batchJobs.appendChild(card);
         });
 
-        // Poll all jobs
+        // Track completion with SSE per job
         let done = 0;
         const total = data.job_ids.length;
         batchStatus.textContent = `0 / ${total} complete`;
 
-        const interval = setInterval(async () => {
-            done = 0;
-            for (const id of data.job_ids) {
-                const r = await fetch(`/status/${id}`);
-                const j = await r.json();
+        data.job_ids.forEach(id => {
+            const es = new EventSource(`/stream/${id}`);
+            sseStreams.push(es);
 
+            es.onmessage = (event) => {
+                const j = JSON.parse(event.data);
                 const statusEl = document.getElementById(`bstatus-${id}`);
                 const titleEl = document.getElementById(`btitle-${id}`);
                 const progEl = document.getElementById(`bprog-${id}`);
                 const cardEl = document.getElementById(`batch-${id}`);
+                const fillEl = document.getElementById(`bfill-${id}`);
 
-                if (j.video_title) titleEl.textContent = j.video_title;
-                progEl.textContent = j.progress;
+                if (j.video_title && titleEl) titleEl.textContent = j.video_title;
+                if (progEl) progEl.textContent = j.progress;
+                if (fillEl) fillEl.style.width = (j.percent || 0) + '%';
 
                 if (j.status === 'done') {
+                    es.close();
                     done++;
-                    statusEl.textContent = `✅ ${j.clips?.length || 0} clips`;
-                    cardEl.classList.add('batch-done');
-                    if (j.clips?.length > 0) {
+                    if (statusEl) statusEl.textContent = `✅ ${j.clips?.length || 0} clips`;
+                    if (cardEl) cardEl.classList.add('batch-done');
+                    if (j.clips?.length > 0 && titleEl) {
                         titleEl.innerHTML = `<a href="/results/${id}" class="batch-link">${j.video_title} →</a>`;
                     }
+                    batchStatus.textContent = `${done} / ${total} complete`;
+                    if (done === total) {
+                        batchStatus.textContent = `All ${total} videos processed!`;
+                        document.getElementById('batch-btn').disabled = false;
+                        document.getElementById('batch-btn').textContent = '🚀 Process All Videos';
+                    }
                 } else if (j.status === 'error') {
+                    es.close();
                     done++;
-                    statusEl.textContent = '❌ Error';
-                    cardEl.classList.add('batch-error');
+                    if (statusEl) statusEl.textContent = '❌ Error';
+                    if (cardEl) cardEl.classList.add('batch-error');
+                    batchStatus.textContent = `${done} / ${total} complete`;
+                    if (done === total) {
+                        batchStatus.textContent = `All ${total} videos processed!`;
+                        document.getElementById('batch-btn').disabled = false;
+                        document.getElementById('batch-btn').textContent = '🚀 Process All Videos';
+                    }
                 } else if (j.status !== 'queued') {
-                    statusEl.textContent = '🔄 Processing';
-                    cardEl.classList.add('batch-active');
+                    if (statusEl) statusEl.textContent = '🔄 Processing';
+                    if (cardEl) {
+                        cardEl.classList.remove('batch-done', 'batch-error');
+                        cardEl.classList.add('batch-active');
+                    }
                 }
-            }
+            };
 
-            batchStatus.textContent = `${done} / ${total} complete`;
-            if (done === total) {
-                clearInterval(interval);
-                batchStatus.textContent = `All ${total} videos processed!`;
-                document.getElementById('batch-btn').disabled = false;
-                document.getElementById('batch-btn').textContent = '🚀 Process All Videos';
-            }
-        }, 2000);
+            es.onerror = () => {
+                es.close();
+            };
+        });
     });
 </script>
 {% endblock %}

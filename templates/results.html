@@ -13,8 +13,11 @@
 
 <div class="clips-grid">
     {% for clip in job.clips %}
-    <div class="clip-card" id="clip-card-{{ loop.index }}">
+    <div class="clip-card" id="clip-card-{{ loop.index }}" style="--delay: {{ (loop.index0) * 80 }}ms">
         <div class="clip-preview">
+            <div class="clip-preview-overlay">
+                <div class="play-icon"></div>
+            </div>
             <video controls preload="metadata">
                 <source src="/clips/{{ job_id }}/{{ clip.filename }}" type="video/mp4">
             </video>
@@ -206,6 +209,7 @@
         margin-top: 6px;
         padding: 8px 0 2px;
         border-top: 1px solid rgba(255, 255, 255, 0.06);
+        animation: fadeInUp 0.3s ease both;
     }
 
     .btn-details {
@@ -216,6 +220,7 @@
         cursor: pointer;
         padding: 2px 0;
         margin-top: 2px;
+        transition: color 0.2s ease;
     }
 
     .btn-details:hover {
@@ -243,9 +248,42 @@
 </div>
 {% else %}
 <div class="card">
-    <h2>Processing...</h2>
-    <p class="status-text">{{ job.progress }}</p>
-    <script>setTimeout(() => location.reload(), 2000);</script>
+    <div class="processing-header">
+        <div class="spinner"></div>
+        <h2>Processing...</h2>
+    </div>
+    <p class="status-text" id="live-status">{{ job.progress }}</p>
+
+    <div class="progress-bar-container">
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="live-progress-fill" style="width: {{ job.percent | default(0) }}%"></div>
+        </div>
+        <div class="progress-percent" id="live-progress-pct">{{ job.percent | default(0) }}%</div>
+    </div>
+
+    <script>
+        // SSE for live processing on results page
+        (function () {
+            const es = new EventSource('/stream/{{ job_id }}');
+            es.onmessage = (e) => {
+                const d = JSON.parse(e.data);
+                const statusEl = document.getElementById('live-status');
+                const fillEl = document.getElementById('live-progress-fill');
+                const pctEl = document.getElementById('live-progress-pct');
+                if (statusEl) statusEl.textContent = d.progress;
+                if (fillEl) fillEl.style.width = (d.percent || 0) + '%';
+                if (pctEl) pctEl.textContent = (d.percent || 0) + '%';
+                if (d.status === 'done' || d.status === 'error') {
+                    es.close();
+                    location.reload();
+                }
+            };
+            es.onerror = () => {
+                es.close();
+                setTimeout(() => location.reload(), 2000);
+            };
+        })();
+    </script>
 </div>
 {% endif %}
 {% endblock %}
@@ -254,10 +292,8 @@
 <script>
     function toggleDetails(idx) {
         const el = document.getElementById('details-' + idx);
-        const btn = el.previousElementSibling || el.parentElement.querySelector('.btn-details');
         if (el.style.display === 'none') {
             el.style.display = 'block';
-            // Find the button that triggered this
             const btns = el.parentElement.querySelectorAll('.btn-details');
             btns.forEach(b => { if (b.textContent.includes('Details')) b.textContent = '▾ Details'; });
         } else {
@@ -266,6 +302,18 @@
             btns.forEach(b => b.textContent = '▸ Details');
         }
     }
+
+    // Video play overlay handling
+    document.querySelectorAll('.clip-preview video').forEach(v => {
+        v.addEventListener('play', () => {
+            const o = v.parentElement.querySelector('.clip-preview-overlay');
+            if (o) o.style.opacity = '0';
+        });
+        v.addEventListener('pause', () => {
+            const o = v.parentElement.querySelector('.clip-preview-overlay');
+            if (o) o.style.opacity = '';
+        });
+    });
 
     let ytAuth = false;
     async function checkYouTubeStatus() {

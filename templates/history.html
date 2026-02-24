@@ -10,7 +10,8 @@
 
 <div class="history-list">
     {% for job_id, job in jobs %}
-    <a href="/results/{{ job_id }}" class="history-card" style="text-decoration: none;">
+    <a href="/results/{{ job_id }}" class="history-card"
+        style="text-decoration: none; --delay: {{ loop.index0 * 50 }}ms">
         <div class="history-left">
             <div class="history-status
                 {% if job.status == 'done' %}status-done

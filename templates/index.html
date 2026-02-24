@@ -24,6 +24,14 @@
         <h2 id="processing-title">Processing...</h2>
     </div>
     <p id="processing-status" class="status-text">Starting...</p>
+
+    <div class="progress-bar-container">
+        <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progress-fill" style="width: 0%"></div>
+        </div>
+        <div class="progress-percent" id="progress-percent">0%</div>
+    </div>
+
     <div class="progress-steps">
         <div class="step" id="step-download">
             <div class="step-dot"></div><span>Download</span>
@@ -62,6 +70,8 @@
     const processingTitle = document.getElementById('processing-title');
     const clipsGrid = document.getElementById('clips-grid');
     const newVideoBtn = document.getElementById('new-video-btn');
+    const progressFill = document.getElementById('progress-fill');
+    const progressPercent = document.getElementById('progress-percent');
 
     const stepMap = {
         'downloading': 'step-download', 'transcribing': 'step-transcribe',
@@ -82,6 +92,7 @@
         processingCard.classList.remove('hidden');
         resultsSection.classList.add('hidden');
         resetSteps();
+        setProgress(0);
 
         const res = await fetch('/process', {
             method: 'POST',
@@ -90,7 +101,7 @@
         });
         const data = await res.json();
         if (data.error) { statusText.textContent = data.error; return; }
-        pollStatus(data.job_id);
+        streamStatus(data.job_id);
     });
 
     newVideoBtn.addEventListener('click', () => {
@@ -98,11 +109,17 @@
         processingCard.classList.add('hidden');
         resultsSection.classList.add('hidden');
         document.getElementById('source-input').value = '';
+        setProgress(0);
     });
 
     function resetSteps() {
         document.querySelectorAll('.step').forEach(s => s.classList.remove('active', 'done'));
         document.querySelectorAll('.step-line').forEach(l => l.classList.remove('active'));
+    }
+
+    function setProgress(pct) {
+        progressFill.style.width = pct + '%';
+        progressPercent.textContent = pct + '%';
     }
 
     function updateSteps(status) {
@@ -119,12 +136,44 @@
         lines.forEach((l, i) => { if (i < idx || (status === 'done')) l.classList.add('active'); });
     }
 
-    async function pollStatus(jobId) {
+    function streamStatus(jobId) {
+        const source = new EventSource(`/stream/${jobId}`);
+
+        source.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.error) { statusText.textContent = data.error; source.close(); return; }
+
+            statusText.textContent = data.progress;
+            updateSteps(data.status);
+            setProgress(data.percent || 0);
+
+            if (data.status === 'done') {
+                source.close();
+                processingCard.classList.add('hidden');
+                if (data.clips?.length > 0) showResults(jobId, data);
+                else { inputCard.classList.remove('hidden'); }
+            }
+            if (data.status === 'error') {
+                source.close();
+                processingTitle.textContent = 'Error';
+                document.querySelector('.spinner').style.display = 'none';
+            }
+        };
+
+        source.onerror = () => {
+            source.close();
+            // Fallback to polling if SSE fails
+            fallbackPoll(jobId);
+        };
+    }
+
+    async function fallbackPoll(jobId) {
         const interval = setInterval(async () => {
             const res = await fetch(`/status/${jobId}`);
             const data = await res.json();
             statusText.textContent = data.progress;
             updateSteps(data.status);
+            setProgress(data.percent || 0);
             if (data.status === 'done') {
                 clearInterval(interval);
                 processingCard.classList.add('hidden');
@@ -143,18 +192,21 @@
         resultsSection.classList.remove('hidden');
         document.getElementById('results-title').textContent = `${data.clips.length} Clips from "${data.video_title}"`;
         clipsGrid.innerHTML = '';
-        data.clips.forEach(clip => {
+        data.clips.forEach((clip, idx) => {
             const card = document.createElement('div');
             card.className = 'clip-card';
+            card.style.setProperty('--delay', `${idx * 80}ms`);
+            const title = clip.auto_title && clip.auto_title !== `Clip ${clip.index}` ? clip.auto_title : `Clip ${clip.index}`;
             card.innerHTML = `
             <div class="clip-preview">
+                <div class="clip-preview-overlay"><div class="play-icon"></div></div>
                 <video controls preload="metadata">
                     <source src="/clips/${jobId}/${clip.filename}" type="video/mp4">
                 </video>
             </div>
             <div class="clip-info">
                 <div class="clip-header">
-                    <h3>Clip ${clip.index}</h3>
+                    <h3>${title}</h3>
                     <span class="clip-badge">${clip.duration}s</span>
                 </div>
                 <p class="clip-time">${clip.start}s → ${clip.end}s</p>
@@ -165,10 +217,21 @@
                 </div>
                 <div class="clip-actions">
                     <a href="/download/${jobId}/${clip.filename}" class="btn-download">⬇ Download</a>
-                    <button class="btn-upload" onclick="uploadClip(this,'${jobId}','${clip.filename}','Clip ${clip.index} - ${data.video_title}')">📤 YouTube</button>
+                    <button class="btn-upload" onclick="uploadClip(this,'${jobId}','${clip.filename}','${title.replace(/'/g, "\\'")}')">📤 YouTube</button>
                 </div>
             </div>`;
             clipsGrid.appendChild(card);
+        });
+        // Hide overlay when video plays
+        document.querySelectorAll('.clip-preview video').forEach(v => {
+            v.addEventListener('play', () => {
+                const overlay = v.parentElement.querySelector('.clip-preview-overlay');
+                if (overlay) overlay.style.opacity = '0';
+            });
+            v.addEventListener('pause', () => {
+                const overlay = v.parentElement.querySelector('.clip-preview-overlay');
+                if (overlay) overlay.style.opacity = '';
+            });
         });
         checkYouTubeStatus();
     }
